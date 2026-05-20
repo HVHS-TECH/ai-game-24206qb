@@ -1,15 +1,315 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>My AI game</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TETRIS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07080f;
+      --surface:  #0d0f1c;
+      --border:   #1c2340;
+      --accent:   #00e5b0;
+      --accent2:  #ff4f6e;
+      --text:     #cdd6f4;
+      --muted:    #45475a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 12px 40px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+    header h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(28px, 6vw, 50px);
+      font-weight: 900;
+      letter-spacing: 14px;
+      color: var(--accent);
+      text-shadow: 0 0 24px rgba(0,229,176,0.55), 0 0 70px rgba(0,229,176,0.15);
+    }
+    header p {
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: var(--muted);
+      margin-top: 5px;
+      text-transform: uppercase;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ── Panels ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px 14px;
+      width: 130px;
+    }
+    .panel-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .panel-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      text-shadow: 0 0 8px rgba(0,229,176,0.4);
+      line-height: 1;
+    }
+    .stat { margin-bottom: 18px; }
+    .stat:last-child { margin-bottom: 0; }
+
+    .mini-canvas {
+      display: block;
+      width: 100%;
+      background: #05060d;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-top: 6px;
+    }
+
+    /* ── Game area ── */
+    .game-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    #gameCanvas {
+      display: block;
+      background: #05060d;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(7,8,15,0.92);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 10;
+    }
+    #overlay h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 20px;
+      letter-spacing: 6px;
+      color: var(--accent);
+      text-shadow: 0 0 18px rgba(0,229,176,0.6);
+    }
+    #overlay .info {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-align: center;
+      line-height: 2.1;
+    }
+    #overlay .final-score {
+      font-family: 'Orbitron', monospace;
+      font-size: 30px;
+      color: var(--accent2);
+      text-shadow: 0 0 14px rgba(255,79,110,0.5);
+    }
+    .btn {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      padding: 10px 30px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, box-shadow 0.2s;
+      text-transform: uppercase;
+    }
+    .btn:hover {
+      background: rgba(0,229,176,0.1);
+      box-shadow: 0 0 20px rgba(0,229,176,0.3);
+    }
+    .btn:active { transform: scale(0.97); }
+
+    /* ── Controls hint ── */
+    .controls {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      line-height: 2.1;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .controls span { color: var(--text); }
+
+    /* ── Line flash ── */
+    .line-fx {
+      position: absolute;
+      left: 0; right: 0;
+      height: 30px;
+      background: rgba(0,229,176,0.2);
+      border-top: 1px solid var(--accent);
+      border-bottom: 1px solid var(--accent);
+      pointer-events: none;
+      animation: linefx 0.3s ease-out forwards;
+      z-index: 8;
+    }
+    @keyframes linefx {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ── Mobile touch buttons ── */
+    .touch-controls {
+      display: none;
+      margin-top: 18px;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .touch-row { display: flex; gap: 10px; }
+    .touch-btn {
+      width: 60px; height: 60px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 22px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.1s;
+    }
+    .touch-btn:active { background: #151728; }
+    .touch-btn.wide { width: 130px; font-size: 13px; letter-spacing: 2px; }
+
+    @media (max-width: 600px) {
+      .touch-controls { display: flex; }
+      .panel { width: 108px; padding: 12px 10px; }
+      .panel-value { font-size: 18px; }
+    }
+  </style>
 </head>
 <body>
 
-<h1>AI game goes here</h1>
+  <header>
+    <h1>TETRIS</h1>
+    <p>12 unique pieces &nbsp;·&nbsp; HTML &amp; JavaScript</p>
+  </header>
 
+  <div class="layout">
 
+    <!-- LEFT PANEL -->
+    <div class="panel">
+      <div class="stat">
+        <div class="panel-label">Score</div>
+        <div class="panel-value" id="scoreVal">0</div>
+      </div>
+      <div class="stat">
+        <div class="panel-label">Lines</div>
+        <div class="panel-value" id="linesVal">0</div>
+      </div>
+      <div class="stat">
+        <div class="panel-label">Level</div>
+        <div class="panel-value" id="levelVal">1</div>
+      </div>
+      <div class="stat">
+        <div class="panel-label">Best</div>
+        <div class="panel-value" id="bestVal">0</div>
+      </div>
+    </div>
 
-<script src="game.js"></script>
+    <!-- GAME CANVAS -->
+    <div class="game-wrap" id="gameWrap">
+      <canvas id="gameCanvas" width="300" height="600"></canvas>
+
+      <div id="overlay">
+        <h2 id="overlayTitle">TETRIS</h2>
+        <div class="info" id="overlayInfo">
+          ← → &nbsp; Move<br>
+          ↑ / X &nbsp; Rotate right<br>
+          Z &nbsp; Rotate left<br>
+          ↓ &nbsp; Soft drop<br>
+          SPACE &nbsp; Hard drop<br>
+          SHIFT &nbsp; Hold piece<br>
+          P &nbsp; Pause
+        </div>
+        <div class="final-score" id="finalScore" style="display:none"></div>
+        <button class="btn" id="actionBtn">START GAME</button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel">
+      <div class="stat">
+        <div class="panel-label">Next</div>
+        <canvas class="mini-canvas" id="nextCanvas" width="110" height="110"></canvas>
+      </div>
+      <div class="stat">
+        <div class="panel-label">Hold</div>
+        <canvas class="mini-canvas" id="holdCanvas" width="110" height="110"></canvas>
+      </div>
+      <div class="controls">
+        <span>← →</span> Move<br>
+        <span>↑ X</span> Rotate →<br>
+        <span>Z</span> Rotate ←<br>
+        <span>↓</span> Soft drop<br>
+        <span>SPC</span> Hard drop<br>
+        <span>SHF</span> Hold<br>
+        <span>P</span> Pause
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Mobile buttons -->
+  <div class="touch-controls" id="touchControls">
+    <div class="touch-row">
+      <div class="touch-btn" id="tbRotL">↺</div>
+      <div class="touch-btn" id="tbUp">↑</div>
+      <div class="touch-btn" id="tbRotR">↻</div>
+      <div class="touch-btn" id="tbHold">H</div>
+    </div>
+    <div class="touch-row">
+      <div class="touch-btn" id="tbLeft">←</div>
+      <div class="touch-btn" id="tbDown">↓</div>
+      <div class="touch-btn" id="tbRight">→</div>
+      <div class="touch-btn wide" id="tbDrop">DROP</div>
+    </div>
+  </div>
+
+  <!-- Load game logic -->
+  <script src="game.js"></script>
+
 </body>
 </html>
 
